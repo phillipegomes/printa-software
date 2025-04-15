@@ -15,14 +15,18 @@ from src.ui.slideshow_window import SlideshowWindow
 class MainWindow(QMainWindow):
     def __init__(self, evento_path):
         super().__init__()
-        self.setWindowTitle("Print A – Evento")
-        self.setGeometry(100, 100, 1200, 800)
-        self.setStyleSheet("background-color: #1e1e1e; color: white; font-family: Arial;")
 
         self.evento_path = evento_path
+        self.evento_nome = os.path.basename(evento_path)
+        print(f"[DEBUG] Evento carregado: {self.evento_nome}")
+
         self.fotos_path = os.path.join(self.evento_path, "Fotos")
         self.config = ConfigManager(evento_path).load_config()
         self.whatsapp = WhatsAppSender(self.config.get("whatsapp", {}))
+
+        self.setWindowTitle(f"{self.evento_nome} – Print A")
+        self.setGeometry(100, 100, 1200, 800)
+        self.setStyleSheet("background-color: #1e1e1e; color: white; font-family: Arial;")
 
         self.image_paths = []
         self.current_image_path = None
@@ -35,10 +39,13 @@ class MainWindow(QMainWindow):
         self.create_top_bar()
         self.create_image_area()
         self.create_thumbnail_area()
+        self.create_footer()
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_for_new_images)
         self.timer.start(2000)
+
+        self.check_for_new_images()
 
     def create_top_bar(self):
         top_bar = QHBoxLayout()
@@ -78,10 +85,10 @@ class MainWindow(QMainWindow):
         self.main_layout.addLayout(top_bar)
 
     def create_image_area(self):
-        self.image_label = QLabel()
+        self.image_label = QLabel("Nenhuma imagem disponível.")
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_label.setMinimumHeight(500)
-        self.image_label.setStyleSheet("border: 2px solid #444; margin: 10px;")
+        self.image_label.setStyleSheet("border: 2px solid #444; margin: 10px; font-size: 18px; color: gray;")
         self.main_layout.addWidget(self.image_label)
 
     def create_thumbnail_area(self):
@@ -90,6 +97,12 @@ class MainWindow(QMainWindow):
         self.thumbnail_container = QWidget()
         self.thumbnail_container.setLayout(self.thumbnail_layout)
         self.main_layout.addWidget(self.thumbnail_container)
+
+    def create_footer(self):
+        footer = QLabel("Todos os direitos reservados à Foto A – www.photoa.com.br")
+        footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        footer.setStyleSheet("color: #777; font-size: 12px; margin-top: 15px;")
+        self.main_layout.addWidget(footer)
 
     def check_for_new_images(self):
         if not os.path.exists(self.fotos_path):
@@ -109,6 +122,11 @@ class MainWindow(QMainWindow):
 
         self.thumbnail_widgets.clear()
 
+        if not self.image_paths:
+            self.image_label.setText("Nenhuma imagem disponível.")
+            self.image_label.setPixmap(QPixmap())
+            return
+
         for path in self.image_paths[:4]:
             thumbnail = QLabel()
             thumbnail.setPixmap(QPixmap(path).scaled(200, 200, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
@@ -118,14 +136,15 @@ class MainWindow(QMainWindow):
             self.thumbnail_layout.addWidget(thumbnail)
             self.thumbnail_widgets.append(thumbnail)
 
-        if self.image_paths:
-            self.display_image(self.image_paths[0])
+        self.display_image(self.image_paths[0])
 
     def display_image(self, path):
+        if not os.path.exists(path):
+            return
         self.current_image_path = path
         pixmap = QPixmap(path).scaled(900, 500, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self.image_label.setPixmap(pixmap)
-        self.image_label.repaint()
+        self.image_label.setText("")
 
     def enviar_whatsapp(self):
         if self.current_image_path:
@@ -141,6 +160,6 @@ class MainWindow(QMainWindow):
 
     def voltar_para_eventos(self):
         from src.ui.event_window import EventWindow
-        self.hide()
+        self.close()
         self.event_window = EventWindow()
         self.event_window.show()
