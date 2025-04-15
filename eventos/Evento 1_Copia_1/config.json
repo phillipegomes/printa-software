@@ -1,0 +1,18 @@
+{
+    "ia": {
+        "ativo": true
+    },
+    "layout": {
+        "ativo": true
+    },
+    "impressao": {
+        "auto": true,
+        "max_por_foto": 5
+    },
+    "whatsapp": {
+        "ativo": true
+    },
+    "qr": {
+        "ativo": true
+    }
+}

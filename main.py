@@ -1,11 +1,11 @@
 
 import sys
 from PyQt6.QtWidgets import QApplication
-from src.ui.main_window import MainWindow
+from src.ui.event_window import EventWindow
 
 def main():
     app = QApplication(sys.argv)
-    window = MainWindow()
+    window = EventWindow()
     window.show()
     sys.exit(app.exec())
 

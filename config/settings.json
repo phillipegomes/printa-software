@@ -1,1 +1,129 @@
-{ "evento_ativo": "Evento_Teste", "pasta_fotos": "eventos/Evento_Teste/Fotos" }
+# src/ui/compartilhamento_config.py
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QCheckBox,
+    QFileDialog, QHBoxLayout
+)
+from PyQt6.QtCore import Qt
+import json, os
+
+class CompartilhamentoConfig(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Configurações de Compartilhamento")
+        self.setStyleSheet("background-color: #1e1e1e; color: white; font-family: Arial;")
+        self.setFixedSize(500, 400)
+        layout = QVBoxLayout()
+
+        self.config_path = "config/settings.json"
+        self.config = self.carregar_configuracoes()
+
+        # WhatsApp
+        self.checkbox_whatsapp = QCheckBox("Ativar envio por WhatsApp")
+        self.checkbox_whatsapp.setChecked(self.config.get("whatsapp_ativo", False))
+        layout.addWidget(self.checkbox_whatsapp)
+
+        self.input_numero = QLineEdit()
+        self.input_numero.setPlaceholderText("Número da empresa (ex: 5511999999999)")
+        self.input_numero.setText(self.config.get("whatsapp_numero", ""))
+        layout.addWidget(self.input_numero)
+
+        self.input_mensagem = QLineEdit()
+        self.input_mensagem.setPlaceholderText("Mensagem padrão para envio")
+        self.input_mensagem.setText(self.config.get("whatsapp_mensagem", ""))
+        layout.addWidget(self.input_mensagem)
+
+        btn_whats_layout = QHBoxLayout()
+        self.btn_salvar_whats = QPushButton("Salvar WhatsApp")
+        self.btn_reverter_whats = QPushButton("Reverter padrão")
+        self.btn_salvar_whats.clicked.connect(self.salvar_whatsapp)
+        self.btn_reverter_whats.clicked.connect(self.reverter_whatsapp)
+        btn_whats_layout.addWidget(self.btn_salvar_whats)
+        btn_whats_layout.addWidget(self.btn_reverter_whats)
+        layout.addLayout(btn_whats_layout)
+
+        # QR Code + SmugMug
+        self.checkbox_qr = QCheckBox("Ativar QR Code e SmugMug")
+        self.checkbox_qr.setChecked(self.config.get("qr_ativo", False))
+        layout.addWidget(self.checkbox_qr)
+
+        self.input_link_base = QLineEdit()
+        self.input_link_base.setPlaceholderText("Link base para SmugMug")
+        self.input_link_base.setText(self.config.get("qr_link", ""))
+        layout.addWidget(self.input_link_base)
+
+        btn_qr_layout = QHBoxLayout()
+        self.btn_salvar_qr = QPushButton("Salvar QR Code")
+        self.btn_reverter_qr = QPushButton("Reverter padrão")
+        self.btn_salvar_qr.clicked.connect(self.salvar_qr)
+        self.btn_reverter_qr.clicked.connect(self.reverter_qr)
+        btn_qr_layout.addWidget(self.btn_salvar_qr)
+        btn_qr_layout.addWidget(self.btn_reverter_qr)
+        layout.addLayout(btn_qr_layout)
+
+        # Backup extra
+        self.checkbox_backup = QCheckBox("Salvar também em uma pasta extra")
+        self.checkbox_backup.setChecked(self.config.get("backup_ativo", False))
+        layout.addWidget(self.checkbox_backup)
+
+        self.btn_selecionar_pasta = QPushButton("Selecionar pasta de backup")
+        self.btn_selecionar_pasta.clicked.connect(self.selecionar_pasta_backup)
+        pasta_atual = self.config.get("backup_pasta", "")
+        if pasta_atual:
+            self.btn_selecionar_pasta.setText(f"📁 {pasta_atual}")
+        layout.addWidget(self.btn_selecionar_pasta)
+
+        btn_backup_layout = QHBoxLayout()
+        self.btn_salvar_backup = QPushButton("Salvar Backup")
+        self.btn_reverter_backup = QPushButton("Reverter padrão")
+        self.btn_salvar_backup.clicked.connect(self.salvar_backup)
+        self.btn_reverter_backup.clicked.connect(self.reverter_backup)
+        btn_backup_layout.addWidget(self.btn_salvar_backup)
+        btn_backup_layout.addWidget(self.btn_reverter_backup)
+        layout.addLayout(btn_backup_layout)
+
+        self.setLayout(layout)
+
+    def carregar_configuracoes(self):
+        if os.path.exists(self.config_path):
+            with open(self.config_path, "r") as f:
+                return json.load(f)
+        return {}
+
+    def salvar_configuracoes(self):
+        with open(self.config_path, "w") as f:
+            json.dump(self.config, f, indent=4)
+
+    def salvar_whatsapp(self):
+        self.config["whatsapp_ativo"] = self.checkbox_whatsapp.isChecked()
+        self.config["whatsapp_numero"] = self.input_numero.text()
+        self.config["whatsapp_mensagem"] = self.input_mensagem.text()
+        self.salvar_configuracoes()
+
+    def reverter_whatsapp(self):
+        self.checkbox_whatsapp.setChecked(False)
+        self.input_numero.setText("")
+        self.input_mensagem.setText("")
+
+    def salvar_qr(self):
+        self.config["qr_ativo"] = self.checkbox_qr.isChecked()
+        self.config["qr_link"] = self.input_link_base.text()
+        self.salvar_configuracoes()
+
+    def reverter_qr(self):
+        self.checkbox_qr.setChecked(False)
+        self.input_link_base.setText("")
+
+    def salvar_backup(self):
+        self.config["backup_ativo"] = self.checkbox_backup.isChecked()
+        texto = self.btn_selecionar_pasta.text().replace("📁 ", "")
+        self.config["backup_pasta"] = texto if texto != "Selecionar pasta de backup" else ""
+        self.salvar_configuracoes()
+
+    def reverter_backup(self):
+        self.checkbox_backup.setChecked(False)
+        self.btn_selecionar_pasta.setText("Selecionar pasta de backup")
+
+    def selecionar_pasta_backup(self):
+        pasta = QFileDialog.getExistingDirectory(self, "Selecionar pasta de backup")
+        if pasta:
+            self.btn_selecionar_pasta.setText(f"📁 {pasta}")

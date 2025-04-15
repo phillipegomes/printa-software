@@ -1,0 +1,53 @@
+from PyQt6.QtWidgets import (
+    QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog,
+    QGraphicsScene, QGraphicsView, QGraphicsPixmapItem, QGraphicsTextItem, QGraphicsItem
+)
+from PyQt6.QtGui import QPixmap, QFont, QColor
+from PyQt6.QtCore import Qt, QPointF
+
+class LayoutEditor(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Editor de Layout - Print A")
+        self.setGeometry(100, 100, 900, 650)
+        self.setStyleSheet("background-color: #1e1e1e; color: white; font-family: Arial;")
+
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
+
+        self.top_bar = QHBoxLayout()
+        self.layout.addLayout(self.top_bar)
+
+        self.btn_add_foto = QPushButton("📸 Adicionar Foto")
+        self.btn_add_foto.setStyleSheet("background-color: #444; color: white; padding: 8px;")
+        self.btn_add_foto.clicked.connect(self.add_foto)
+        self.top_bar.addWidget(self.btn_add_foto)
+
+        self.btn_add_texto = QPushButton("🔤 Adicionar Texto")
+        self.btn_add_texto.setStyleSheet("background-color: #444; color: white; padding: 8px;")
+        self.btn_add_texto.clicked.connect(self.add_texto)
+        self.top_bar.addWidget(self.btn_add_texto)
+
+        self.scene = QGraphicsScene()
+        self.view = QGraphicsView(self.scene)
+        self.view.setRenderHint(self.view.viewport().Antialiasing)
+        self.view.setStyleSheet("background-color: white;")
+        self.layout.addWidget(self.view)
+
+        self.setAcceptDrops(True)
+
+    def add_foto(self):
+        file, _ = QFileDialog.getOpenFileName(self, "Escolha uma imagem", "", "Imagens (*.png *.jpg *.jpeg)")
+        if file:
+            pixmap = QPixmap(file).scaled(300, 300, Qt.AspectRatioMode.KeepAspectRatio)
+            item = QGraphicsPixmapItem(pixmap)
+            item.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsMovable | QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
+            self.scene.addItem(item)
+
+    def add_texto(self):
+        texto = QGraphicsTextItem("Texto Exemplo")
+        texto.setFont(QFont("Arial", 18))
+        texto.setDefaultTextColor(QColor("black"))
+        texto.setFlags(QGraphicsItem.GraphicsItemFlag.ItemIsMovable | QGraphicsItem.GraphicsItemFlag.ItemIsSelectable)
+        texto.setPos(QPointF(100, 100))
+        self.scene.addItem(texto)
