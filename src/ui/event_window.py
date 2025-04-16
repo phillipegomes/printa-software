@@ -1,168 +1,160 @@
 
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QMessageBox,
-    QTableWidget, QTableWidgetItem, QHBoxLayout, QAbstractItemView, QHeaderView
-)
-from PyQt6.QtCore import Qt
 import os
-import shutil
-from datetime import datetime
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
+    QLineEdit, QTableWidget, QTableWidgetItem, QMessageBox, QHeaderView,
+    QSpacerItem, QSizePolicy, QFrame, QInputDialog, QMenu
+)
+from PyQt6.QtGui import QAction
+from PyQt6.QtCore import Qt, QPoint
+from datetime import datetime  # ADICIONADO: Importação do datetime
 from src.ui.main_window import MainWindow
+from src.ui.event_actions import criar_evento, duplicar_evento, renomear_evento, excluir_evento
+from src.ui.event_styles import TABELA_STYLE, BOTAO_STYLE, INPUT_STYLE, MENU_STYLE
 
 class EventWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Print A – Eventos")
-        self.setGeometry(200, 100, 900, 600)
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #121212;
-                color: #f2f2f2;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-                font-size: 15px;
-            }
-            QPushButton {
-                background-color: #1f1f1f;
-                color: white;
-                border: 1px solid #2d2d2d;
-                border-radius: 6px;
-                padding: 8px 16px;
-            }
-            QPushButton:hover {
-                background-color: #2a2a2a;
-            }
-            QLineEdit {
-                background-color: #1e1e1e;
-                border: 1px solid #3a3a3c;
-                border-radius: 6px;
-                padding: 10px;
-                color: white;
-            }
-            QHeaderView::section {
-                background-color: #181818;
-                padding: 8px;
-                font-weight: bold;
-                color: #d0d0d0;
-                border: none;
-            }
-            QTableWidget::item:selected {
-                background-color: #2c2c2c;
-            }
-        """)
+        self.setWindowTitle("Print A – Meus Eventos")
+        self.setMinimumSize(800, 600)
+        self.setStyleSheet("background-color: #1e1e1e; color: white;")
+
+        self.eventos_path = "eventos"
+        os.makedirs(self.eventos_path, exist_ok=True)
 
         layout = QVBoxLayout()
+        layout.setContentsMargins(20, 20, 20, 20)
 
-        title = QLabel("Meus Eventos")
-        title.setStyleSheet("font-size: 24px; font-weight: bold;")
-        layout.addWidget(title)
+        titulo = QLabel("Meus Eventos")
+        titulo.setStyleSheet("font-size: 24px; font-weight: 600; margin: 10px;")
+        titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(titulo)
 
-        self.table = QTableWidget()
-        self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(["Nome do Evento", "Data", ""])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.setShowGrid(False)
-        self.table.verticalHeader().setVisible(False)
-        self.table.cellDoubleClicked.connect(self.abrir_evento_duplo_clique)
-        layout.addWidget(self.table)
+        self.tabela = QTableWidget()
+        self.tabela.setColumnCount(3)
+        self.tabela.setHorizontalHeaderLabels(["Nome", "Data", "Excluir"])
+        self.tabela.setColumnWidth(1, 120)
+        self.tabela.setColumnWidth(2, 70)
+        self.tabela.horizontalHeader().setStretchLastSection(False)
+        self.tabela.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.tabela.verticalHeader().setVisible(False)
+        self.tabela.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.tabela.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.tabela.setStyleSheet(TABELA_STYLE)
+        self.tabela.cellClicked.connect(self.selecionar_evento)
+        self.tabela.cellDoubleClicked.connect(self.abrir_evento)
+        self.tabela.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tabela.customContextMenuRequested.connect(self.abrir_menu_contexto)
+        layout.addWidget(self.tabela)
 
-        self.carregar_eventos_existentes()
+        layout.addSpacerItem(QSpacerItem(10, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
-        layout.addSpacing(20)
+        input_frame = QFrame()
+        input_layout = QHBoxLayout()
+        input_frame.setLayout(input_layout)
 
-        form_layout = QHBoxLayout()
-        self.input = QLineEdit()
-        self.input.setPlaceholderText("Nome do novo evento...")
-        form_layout.addWidget(self.input)
+        self.input_nome = QLineEdit()
+        self.input_nome.setPlaceholderText("Digite o nome do novo evento...")
+        self.input_nome.setStyleSheet(INPUT_STYLE)
+        input_layout.addWidget(self.input_nome)
 
-        btn_criar = QPushButton("🟢 Criar Evento")
-        btn_criar.clicked.connect(self.criar_evento)
-        form_layout.addWidget(btn_criar)
+        self.btn_criar = QPushButton("Criar Evento")
+        self.btn_criar.setStyleSheet(BOTAO_STYLE)
+        self.btn_criar.clicked.connect(self.criar_evento_click)
+        input_layout.addWidget(self.btn_criar)
 
-        btn_duplicar = QPushButton("📄 Duplicar Evento Selecionado")
-        btn_duplicar.clicked.connect(self.duplicar_evento_selecionado)
-        form_layout.addWidget(btn_duplicar)
+        self.btn_abrir = QPushButton("Abrir Evento")
+        self.btn_abrir.setEnabled(False)
+        self.btn_abrir.setStyleSheet(BOTAO_STYLE)
+        self.btn_abrir.clicked.connect(self.abrir_evento)
+        input_layout.addWidget(self.btn_abrir)
 
-        layout.addLayout(form_layout)
+        self.btn_duplicar = QPushButton("Duplicar Evento")
+        self.btn_duplicar.setEnabled(False)
+        self.btn_duplicar.setStyleSheet(BOTAO_STYLE)
+        self.btn_duplicar.clicked.connect(self.duplicar_evento_click)
+        input_layout.addWidget(self.btn_duplicar)
+
+        self.btn_renomear = QPushButton("Renomear")
+        self.btn_renomear.setEnabled(False)
+        self.btn_renomear.setStyleSheet(BOTAO_STYLE)
+        self.btn_renomear.clicked.connect(self.renomear_evento_click)
+        input_layout.addWidget(self.btn_renomear)
+
+        layout.addWidget(input_frame)
         self.setLayout(layout)
 
-    def carregar_eventos_existentes(self):
-        self.table.setRowCount(0)
-        eventos_path = "eventos"
-        if not os.path.exists(eventos_path):
-            os.makedirs(eventos_path)
+        self.evento_selecionado = None
+        self.carregar_eventos()
 
-        eventos = sorted(os.listdir(eventos_path), reverse=True)
-        for idx, nome in enumerate(eventos):
-            caminho = os.path.join(eventos_path, nome)
-            if os.path.isdir(caminho) and nome != "default_config.json":
-                data_mod = datetime.fromtimestamp(os.path.getmtime(caminho)).strftime("%d/%m/%Y")
-                self.table.insertRow(idx)
-                self.table.setItem(idx, 0, QTableWidgetItem(nome))
-                self.table.setItem(idx, 1, QTableWidgetItem(data_mod))
+    def carregar_eventos(self):
+        self.tabela.setRowCount(0)
+        for nome in sorted(os.listdir(self.eventos_path)):
+            caminho = os.path.join(self.eventos_path, nome)
+            if os.path.isdir(caminho) and not nome.startswith("."):
+                data = datetime.fromtimestamp(os.path.getmtime(caminho)).strftime("%d/%m/%Y")
+                row = self.tabela.rowCount()
+                self.tabela.insertRow(row)
+                self.tabela.setItem(row, 0, QTableWidgetItem(nome))
+                self.tabela.setItem(row, 1, QTableWidgetItem(data))
 
-                btn_excluir = QPushButton("✖")
-                btn_excluir.setStyleSheet("color: #ff453a; font-size: 16px; margin-right: 4px;")
-                btn_excluir.setToolTip("Excluir Evento")
-                btn_excluir.clicked.connect(lambda _, p=caminho: self.excluir_evento(p))
-
-                layout_btn = QHBoxLayout()
+                btn_excluir = QPushButton("❌")
+                btn_excluir.setStyleSheet("color: #ff4d4f; font-weight: bold; border: none; background: none;")
+                btn_excluir.clicked.connect(lambda _, n=nome: self.excluir_evento_click(n))
+                cell_widget = QWidget()
+                layout_btn = QHBoxLayout(cell_widget)
                 layout_btn.addWidget(btn_excluir)
-                layout_btn.setAlignment(Qt.AlignmentFlag.AlignRight)
+                layout_btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 layout_btn.setContentsMargins(0, 0, 0, 0)
+                self.tabela.setCellWidget(row, 2, cell_widget)
 
-                widget = QWidget()
-                widget.setLayout(layout_btn)
-                self.table.setCellWidget(idx, 2, widget)
+    def selecionar_evento(self, row, column):
+        if column != 2:
+            self.evento_selecionado = self.tabela.item(row, 0).text()
+            self.btn_abrir.setEnabled(True)
+            self.btn_duplicar.setEnabled(True)
+            self.btn_renomear.setEnabled(True)
 
-    def criar_evento(self):
-        nome = self.input.text().strip()
-        if not nome:
-            QMessageBox.warning(self, "Erro", "Digite um nome para o evento.")
+    def criar_evento_click(self):
+        nome = self.input_nome.text().strip()
+        if criar_evento(nome, self.eventos_path):
+            self.carregar_eventos()
+            self.input_nome.clear()
+
+    def abrir_evento(self):
+        if not self.evento_selecionado:
             return
-        caminho = os.path.join("eventos", nome)
-        if os.path.exists(caminho):
-            QMessageBox.warning(self, "Erro", "Esse evento já existe.")
+        evento_path = os.path.join(self.eventos_path, self.evento_selecionado)
+        self.main_window = MainWindow(evento_path)
+        self.main_window.show()
+        self.close()
+
+    def duplicar_evento_click(self):
+        if duplicar_evento(self.evento_selecionado, self.eventos_path):
+            self.carregar_eventos()
+
+    def renomear_evento_click(self):
+        if not self.evento_selecionado:
             return
-        os.makedirs(caminho)
-        os.makedirs(os.path.join(caminho, "Fotos"))
-        default_config = os.path.join("eventos", "default_config.json")
-        if os.path.exists(default_config):
-            shutil.copy(default_config, os.path.join(caminho, "config.json"))
-        self.abrir_main(caminho)
+        novo_nome, ok = QInputDialog.getText(self, "Renomear Evento", "Novo nome:", text=self.evento_selecionado)
+        if ok and novo_nome.strip():
+            if renomear_evento(self.evento_selecionado, novo_nome.strip(), self.eventos_path):
+                self.carregar_eventos()
 
-    def duplicar_evento_selecionado(self):
-        selected = self.table.currentRow()
-        if selected == -1:
-            QMessageBox.warning(self, "Aviso", "Selecione um evento para duplicar.")
-            return
-        nome_origem = self.table.item(selected, 0).text()
-        pasta_origem = os.path.join("eventos", nome_origem)
+    def excluir_evento_click(self, nome):
+        if excluir_evento(nome, self.eventos_path):
+            self.carregar_eventos()
 
-        base_nome = nome_origem + "_Copia"
-        count = 1
-        while os.path.exists(os.path.join("eventos", f"{base_nome}_{count}")):
-            count += 1
-        novo_nome = f"{base_nome}_{count}"
-        destino = os.path.join("eventos", novo_nome)
-        shutil.copytree(pasta_origem, destino)
-        self.carregar_eventos_existentes()
+    def abrir_menu_contexto(self, pos: QPoint):
+        index = self.tabela.indexAt(pos)
+        if index.isValid():
+            row = index.row()
+            self.evento_selecionado = self.tabela.item(row, 0).text()
 
-    def abrir_evento_duplo_clique(self, row, column):
-        nome = self.table.item(row, 0).text()
-        caminho = os.path.join("eventos", nome)
-        self.abrir_main(caminho)
-
-    def abrir_main(self, caminho_evento):
-        self.hide()
-        self.main = MainWindow(evento_path=caminho_evento)
-        self.main.show()
-
-    def excluir_evento(self, caminho_evento):
-        nome = os.path.basename(caminho_evento)
-        confirmar = QMessageBox.question(self, "Excluir Evento", f"Tem certeza que deseja excluir o evento '{nome}'?")
-        if confirmar == QMessageBox.StandardButton.Yes:
-            shutil.rmtree(caminho_evento)
-            self.carregar_eventos_existentes()
+            menu = QMenu(self)
+            menu.setStyleSheet(MENU_STYLE)
+            menu.addAction("Abrir Evento", self.abrir_evento)
+            menu.addAction("Duplicar Evento", self.duplicar_evento_click)
+            menu.addAction("Renomear Evento", self.renomear_evento_click)
+            menu.addAction("Excluir Evento", lambda: self.excluir_evento_click(self.evento_selecionado))
+            menu.exec(self.tabela.mapToGlobal(pos))

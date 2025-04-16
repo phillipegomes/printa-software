@@ -1,113 +1,120 @@
+# src/ui/gallery_window.py
 
 from PyQt6.QtWidgets import (
-    QWidget, QScrollArea, QVBoxLayout, QGridLayout, QLabel, QPushButton,
-    QHBoxLayout, QMessageBox, QFrame
+    QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton,
+    QScrollArea, QGridLayout, QSpinBox, QMessageBox
 )
-from PyQt6.QtGui import QPixmap, QCursor
+from PyQt6.QtGui import QPixmap, QIcon
 from PyQt6.QtCore import Qt
 import os
 
 class GalleryWindow(QWidget):
-    def __init__(self, image_paths, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Galeria – Print A")
-        self.setGeometry(200, 100, 1000, 700)
-        self.image_paths = image_paths
+    def __init__(self, evento_path, main_window):
+        super().__init__()
+        self.setWindowTitle("Galeria - Print A")
+        self.setGeometry(150, 150, 1100, 800)
+        self.setStyleSheet("background-color: #121212; color: white; font-family: Arial;")
 
-        layout = QVBoxLayout()
+        self.evento_path = evento_path
+        self.main_window = main_window
+        self.image_paths = []
+
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll_content = QWidget()
+        content = QWidget()
         self.grid = QGridLayout()
-        scroll_content.setLayout(self.grid)
-        scroll.setWidget(scroll_content)
+        content.setLayout(self.grid)
+        scroll.setWidget(content)
 
-        layout.addWidget(scroll)
-        self.setLayout(layout)
+        self.layout.addWidget(scroll)
 
-        self.populate_grid()
+        self.load_images()
 
-    def populate_grid(self):
-        # Limpa a grade antes de adicionar novas imagens
+    def load_images(self):
+        folder = os.path.join(self.evento_path, "Fotos")
+        self.image_paths = []
+
         for i in reversed(range(self.grid.count())):
             widget = self.grid.itemAt(i).widget()
             if widget:
                 widget.setParent(None)
 
-        row = 0
-        col = 0
-        for idx, path in enumerate(self.image_paths):
-            if not os.path.exists(path):
-                continue
+        if not os.path.exists(folder):
+            return
 
-            container = QFrame()
-            container.setStyleSheet("background-color: #222; border: 1px solid #444; border-radius: 8px;")
-            container.setMinimumSize(220, 250)
-            container.setMaximumSize(220, 250)
-            vbox = QVBoxLayout(container)
-            vbox.setAlignment(Qt.AlignmentFlag.AlignTop)
+        row, col = 0, 0
+        for file in sorted(os.listdir(folder), reverse=True):
+            if file.lower().endswith((".jpg", ".jpeg", ".png")):
+                full_path = os.path.join(folder, file)
+                self.image_paths.append(full_path)
+                self.add_image_widget(full_path, row, col)
+                col += 1
+                if col == 3:
+                    col = 0
+                    row += 1
 
-            img_label = QLabel()
-            img_label.setPixmap(QPixmap(path).scaled(200, 140, Qt.AspectRatioMode.KeepAspectRatio,
-                                                     Qt.TransformationMode.SmoothTransformation))
-            img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            img_label.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-            img_label.mousePressEvent = lambda e, p=path: self.visualizar_imagem(p)
+    def add_image_widget(self, path, row, col):
+        container = QVBoxLayout()
+        widget = QWidget()
+        widget.setStyleSheet("margin: 10px; padding: 10px; border: 1px solid #333;")
 
-            btn_layout = QHBoxLayout()
-            btn_layout.setSpacing(6)
+        image_label = QLabel()
+        image_label.setPixmap(QPixmap(path).scaled(300, 200, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            btn_imprimir = QPushButton("🖨️")
-            btn_imprimir.setToolTip("Imprimir")
-            btn_imprimir.setFixedSize(32, 32)
-            btn_imprimir.clicked.connect(lambda _, p=path: self.imprimir(p))
+        btn_row = QHBoxLayout()
 
-            btn_whatsapp = QPushButton("📤")
-            btn_whatsapp.setToolTip("WhatsApp")
-            btn_whatsapp.setFixedSize(32, 32)
-            btn_whatsapp.clicked.connect(lambda _, p=path: self.enviar_whatsapp(p))
+        btn_print = QPushButton("🖨")
+        btn_print.setToolTip("Imprimir")
+        btn_print.clicked.connect(lambda: self.imprimir(path))
 
-            btn_excluir = QPushButton("❌")
-            btn_excluir.setToolTip("Excluir")
-            btn_excluir.setFixedSize(32, 32)
-            btn_excluir.clicked.connect(lambda _, p=path: self.excluir_imagem(p))
+        self.copias_box = QSpinBox()
+        self.copias_box.setMinimum(1)
+        self.copias_box.setMaximum(self.get_limite_impressoes())
+        self.copias_box.setValue(1)
+        self.copias_box.setToolTip("Número de cópias")
+        self.copias_box.setFixedWidth(60)
 
-            btn_layout.addWidget(btn_imprimir)
-            btn_layout.addWidget(btn_whatsapp)
-            btn_layout.addWidget(btn_excluir)
+        btn_share = QPushButton("📤")
+        btn_share.setToolTip("Compartilhar (WhatsApp)")
+        btn_share.clicked.connect(lambda: self.compartilhar(path))
 
-            vbox.addWidget(img_label)
-            vbox.addLayout(btn_layout)
+        btn_delete = QPushButton("❌")
+        btn_delete.setToolTip("Excluir imagem")
+        btn_delete.clicked.connect(lambda: self.confirmar_exclusao(path))
 
-            self.grid.addWidget(container, row, col)
-            col += 1
-            if col >= 4:
-                row += 1
-                col = 0
+        btn_row.addWidget(btn_print)
+        btn_row.addWidget(self.copias_box)
+        btn_row.addWidget(btn_share)
+        btn_row.addWidget(btn_delete)
 
-    def visualizar_imagem(self, path):
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Visualizar Imagem")
-        pixmap = QPixmap(path).scaled(800, 600, Qt.AspectRatioMode.KeepAspectRatio,
-                                      Qt.TransformationMode.SmoothTransformation)
-        label = QLabel()
-        label.setPixmap(pixmap)
-        msg.layout().addWidget(label)
-        msg.setStandardButtons(QMessageBox.StandardButton.Close)
-        msg.exec()
+        container.addWidget(image_label)
+        container.addLayout(btn_row)
+        widget.setLayout(container)
+        self.grid.addWidget(widget, row, col)
 
-    def excluir_imagem(self, path):
-        confirmar = QMessageBox.question(self, "Excluir", "Deseja realmente excluir esta imagem?")
-        if confirmar == QMessageBox.StandardButton.Yes:
-            try:
-                os.remove(path)
-                self.image_paths.remove(path)
-                self.populate_grid()
-            except Exception as e:
-                QMessageBox.warning(self, "Erro", f"Erro ao excluir: {e}")
+    def get_limite_impressoes(self):
+        return self.main_window.config.get("impressao", {}).get("max_copias", 5)
 
     def imprimir(self, path):
-        print(f"[IMPRIMIR] {path}")  # Substituir pela função real de impressão
+        copias = self.copias_box.value()
+        print(f"[GALERIA] Enviando para impressão: {path} x{copias}")
+        # Aqui entraria a chamada para o gerenciador de impressão
 
-    def enviar_whatsapp(self, path):
-        print(f"[WHATSAPP] {path}")  # Substituir pela função real de envio via WhatsApp
+    def compartilhar(self, path):
+        if not self.main_window.config.get("whatsapp", {}).get("ativo", False):
+            QMessageBox.warning(self, "WhatsApp desativado", "O envio via WhatsApp não está ativado nas configurações.")
+            return
+        print(f"[GALERIA] Enviando via WhatsApp: {path}")
+        self.main_window.whatsapp.enviar(path)
+
+    def confirmar_exclusao(self, path):
+        confirmar = QMessageBox.question(self, "Excluir Imagem", f"Deseja realmente excluir esta imagem?",
+                                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if confirmar == QMessageBox.StandardButton.Yes:
+            os.remove(path)
+            print(f"[GALERIA] Imagem excluída: {path}")
+            self.load_images()
