@@ -2,12 +2,13 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QTextEdit
 from src.modules.report_manager import ReportManager
 
 class RelatorioWindow(QWidget):
-    def __init__(self):
+    def __init__(self, config_manager):
         super().__init__()
         self.setWindowTitle("Relatórios - Print A")
         self.setGeometry(200, 200, 500, 600)
         self.setStyleSheet("background-color: #1e1e1e; color: white; font-family: Arial;")
 
+        self.config_manager = config_manager  # Pode ser usado no futuro
         self.manager = ReportManager()
 
         self.layout = QVBoxLayout()
@@ -36,7 +37,7 @@ class RelatorioWindow(QWidget):
         for k, v in self.manager.data.items():
             if k != "erros":
                 texto += f"{k.capitalize()}: {v}\n"
-        if self.manager.data["erros"]:
+        if self.manager.data.get("erros"):
             texto += "\nErros:\n"
             for erro in self.manager.data["erros"]:
                 texto += f"- {erro['hora']}: {erro['erro']}\n"

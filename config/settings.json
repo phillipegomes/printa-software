@@ -5,11 +5,9 @@
   "compartilhamento": {
     "whatsapp_ativo": false,
     "whatsapp_numero": "",
-    "whatsapp_mensagem": "",
-    "qr_ativo": false,
-    "qr_link": "",
-    "backup_ativo": false,
-    "backup_pasta": ""
+    "whatsapp_mensagem": ""
   },
-  "layout": {}
+  "impressao": {
+    "modelo": "default"
+  }
 }

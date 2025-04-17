@@ -1,58 +1,37 @@
+# src/modules/image_processor.py
+
 import os
 from PIL import Image
-from src.modules.ai_processor import apply_ai_filter
-from src.modules.qr_smugmug import QRSmugMugUploader
+from src.modules.printer_manager import PrinterManager
 from src.modules.whatsapp_sender import WhatsAppSender
-from src.modules.layout_applier import apply_layout  # Simulado
 
 class ImageProcessor:
-    def __init__(self, config, logger):
-        self.config = config
-        self.logger = logger
-        self.qr_uploader = QRSmugMugUploader()
-        self.whatsapp = WhatsAppSender()
+    def __init__(self, evento_path, config_manager):
+        self.evento_path = evento_path
+        self.config_manager = config_manager
+        self.config = self.config_manager.config
 
-    def process_image(self, path_original):
-        try:
-            current_path = path_original
-            self.logger.info(f"Iniciando processamento: {path_original}")
+        self.printer = PrinterManager(
+            self.evento_path,
+            self.config.get("impressao", {})
+        )
 
-            # Aplicar IA se ativado
-            if self.config["ia_ativa"]:
-                self.logger.info("Aplicando IA...")
-                current_path = apply_ai_filter(current_path, estilo=self.config["ia_estilo"])
+        self.whatsapp = WhatsAppSender(
+            self.config.get("compartilhamento", {}).get("whatsapp", {})
+        )
 
-            # Aplicar layout
-            if self.config["layout_path"] and os.path.exists(self.config["layout_path"]):
-                self.logger.info("Aplicando layout...")
-                current_path = apply_layout(current_path, self.config["layout_path"])
+        # Define pastas
+        self.fotos_path = os.path.join(evento_path, "Fotos")
+        self.impressas_path = os.path.join(evento_path, "Impressas")
+        os.makedirs(self.fotos_path, exist_ok=True)
+        os.makedirs(self.impressas_path, exist_ok=True)
 
-            # Salvar em /Impressas
-            impressas_dir = os.path.join(self.config["event_folder"], "Impressas")
-            os.makedirs(impressas_dir, exist_ok=True)
-            nome_final = os.path.basename(current_path)
-            destino = os.path.join(impressas_dir, nome_final)
-            Image.open(current_path).save(destino)
-            self.logger.info(f"Imagem final salva: {destino}")
+    def imprimir(self, imagem_path, copias=1):
+        if not os.path.exists(imagem_path):
+            print("❌ Imagem não encontrada para imprimir:", imagem_path)
+            return
 
-            # Enviar para impressão automática se ativado
-            if self.config["auto_print"]:
-                self.logger.info("Enviando para impressão...")
-                os.system(f"lp '{destino}'")  # Simples envio no Mac/Linux
+        self.printer.imprimir(imagem_path, copias)
 
-            # Enviar para SmugMug + gerar QR
-            if self.config["qr_ativo"]:
-                self.logger.info("Enviando para SmugMug e gerando QR...")
-                self.qr_uploader.gerar_qr(destino)
-                self.qr_uploader.enviar_smugmug(destino)
-
-            # Enviar para WhatsApp
-            if self.config["whatsapp_ativo"]:
-                self.logger.info("Enviando via WhatsApp...")
-                self.whatsapp.enviar(destino)
-
-            return destino
-
-        except Exception as e:
-            self.logger.error(f"Erro ao processar imagem: {e}")
-            return None
+    def enviar_whatsapp(self, imagem_path):
+        self.whatsapp.enviar(imagem_path)

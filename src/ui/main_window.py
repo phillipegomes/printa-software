@@ -1,137 +1,143 @@
+
 # src/ui/main_window.py
 
-import os
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QScrollArea,
-    QFrame, QSizePolicy, QSpacerItem, QMessageBox
+    QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
+    QFileDialog, QMessageBox, QGraphicsDropShadowEffect
 )
+from PyQt6.QtGui import QPixmap, QIcon
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap
-from src.ui.main_styles import MAIN_STYLE, THUMB_STYLE, BUTTON_STYLE, FLOATING_BUTTON_STYLE
-from src.ui.main_actions import carregar_imagens, imprimir_imagem, excluir_imagem, enviar_whatsapp
+import os
+from src.modules.config_manager import ConfigManager
+from src.modules.image_processor import ImageProcessor
+from src.modules.file_watcher import FileWatcher
+from src.ui.gallery_window import GalleryWindow
 
 class MainWindow(QWidget):
-    def __init__(self, evento_path, controller=None):
+    def __init__(self, evento_path, controller):
         super().__init__()
-        self.evento_path = evento_path
+        self.setWindowTitle("Print A - Evento")
+        self.setGeometry(100, 100, 1000, 700)
+        self.setStyleSheet("background-color: #1e1e1e; color: white; font-family: Arial;")
+
         self.controller = controller
+        self.evento_path = evento_path
         self.fotos_path = os.path.join(evento_path, "Fotos")
-        self.imagens = []
-        self.imagem_atual = None
+        os.makedirs(self.fotos_path, exist_ok=True)
 
-        self.setWindowTitle(os.path.basename(evento_path) + " - Print A")
-        self.setMinimumSize(1000, 700)
-        self.setStyleSheet(MAIN_STYLE)
+        self.config_manager = ConfigManager()
+        self.config_manager.carregar_config()
+        self.config = self.config_manager.config
 
-        layout = QVBoxLayout()
+        self.processor = ImageProcessor(self.evento_path, self.config_manager)
+        self.file_watcher = FileWatcher(self.fotos_path, self.nova_foto_detectada)
+
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
+
+        # Topo
         top_bar = QHBoxLayout()
+        self.btn_voltar = QPushButton("⬅ Voltar")
+        self.btn_voltar.clicked.connect(self.controller.open_event_window)
+        self.btn_voltar.setFixedHeight(40)
+        self.btn_voltar.setStyleSheet("background-color: #444; color: white;")
 
-        self.btn_voltar = QPushButton("← Voltar")
-        self.btn_voltar.setStyleSheet(BUTTON_STYLE)
-        self.btn_voltar.clicked.connect(self.voltar)
-        top_bar.addWidget(self.btn_voltar)
-
-        top_bar.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
-
-        self.btn_config = QPushButton("⚙️ Configurações")
-        self.btn_config.setStyleSheet(BUTTON_STYLE)
+        self.btn_config = QPushButton("⚙ Configurações")
         self.btn_config.clicked.connect(self.abrir_configuracoes)
+        self.btn_config.setFixedHeight(40)
+        self.btn_config.setStyleSheet("background-color: #444; color: white;")
+
+        top_bar.addWidget(self.btn_voltar)
+        top_bar.addStretch()
         top_bar.addWidget(self.btn_config)
+        self.layout.addLayout(top_bar)
 
-        layout.addLayout(top_bar)
+        # Foto principal
+        self.label_foto = QLabel()
+        self.label_foto.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.layout.addWidget(self.label_foto)
 
-        self.label_imagem = QLabel("Nenhuma imagem selecionada")
-        self.label_imagem.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label_imagem.setStyleSheet("font-size: 18px; padding: 20px;")
-        layout.addWidget(self.label_imagem, stretch=1)
+        # Botões de ação
+        self.botoes_acao = QHBoxLayout()
+        self.botoes_acao.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.actions_layout = QHBoxLayout()
-        self.actions_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addLayout(self.actions_layout)
+        self.btn_imprimir = QPushButton("🖨️ 1x")
+        self.btn_imprimir.setFixedSize(80, 35)
+        self.btn_imprimir.clicked.connect(self.imprimir_foto)
 
-        self.area_thumbs = QScrollArea()
-        self.area_thumbs.setWidgetResizable(True)
-        self.area_thumbs.setFixedHeight(200)
-        self.area_thumbs.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.area_thumbs.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.btn_whats = QPushButton("📤")
+        self.btn_whats.setFixedSize(50, 35)
+        self.btn_whats.setEnabled(self.config.get("compartilhamento", {}).get("whatsapp_ativo", False))
+        self.btn_whats.clicked.connect(self.enviar_whatsapp)
 
-        self.container_thumbs = QFrame()
-        self.thumbs_layout = QHBoxLayout()
-        self.thumbs_layout.setSpacing(10)
-        self.container_thumbs.setLayout(self.thumbs_layout)
-        self.area_thumbs.setWidget(self.container_thumbs)
+        self.btn_excluir = QPushButton("❌")
+        self.btn_excluir.setFixedSize(50, 35)
+        self.btn_excluir.clicked.connect(self.excluir_foto)
 
-        layout.addWidget(self.area_thumbs)
-        self.setLayout(layout)
+        self.botoes_acao.addWidget(self.btn_imprimir)
+        self.botoes_acao.addWidget(self.btn_whats)
+        self.botoes_acao.addWidget(self.btn_excluir)
 
-        self.carregar()
+        self.layout.addLayout(self.botoes_acao)
 
-    def carregar(self):
-        self.imagens = carregar_imagens(self.fotos_path)
-        self.thumbs_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.thumbs_layout.setContentsMargins(10, 0, 10, 0)
-        self.thumbs_layout.setSpacing(10)
+        # Miniaturas
+        self.thumbnail_bar = QHBoxLayout()
+        self.thumbnail_bar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.layout.addLayout(self.thumbnail_bar)
 
-        for imagem in self.imagens[-4:]:
-            thumb_frame = QFrame()
-            thumb_frame.setFixedSize(160, 180)
-            thumb_frame.setStyleSheet(THUMB_STYLE)
+        self.foto_atual = None
+        self.atualizar_miniaturas()
 
-            thumb_layout = QVBoxLayout()
-            thumb_layout.setContentsMargins(0, 0, 0, 0)
-            thumb_layout.setSpacing(4)
+    def nova_foto_detectada(self, caminho):
+        self.atualizar_miniaturas()
 
-            img_label = QLabel()
-            img_label.setPixmap(QPixmap(imagem).scaledToHeight(140))
-            img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            img_label.mousePressEvent = lambda e, img=imagem: self.mostrar_imagem(img)
-            thumb_layout.addWidget(img_label)
-
-            thumb_frame.setLayout(thumb_layout)
-            self.thumbs_layout.addWidget(thumb_frame)
-
-        if self.imagens:
-            self.mostrar_imagem(self.imagens[-1])
-
-    def mostrar_imagem(self, path):
-        self.imagem_atual = path
-        pixmap = QPixmap(path).scaled(800, 600, Qt.AspectRatioMode.KeepAspectRatio)
-        self.label_imagem.setPixmap(pixmap)
-
-        # Remove botões antigos
-        for i in reversed(range(self.actions_layout.count())):
-            widget = self.actions_layout.itemAt(i).widget()
+    def atualizar_miniaturas(self):
+        # Limpa miniaturas
+        while self.thumbnail_bar.count():
+            item = self.thumbnail_bar.takeAt(0)
+            widget = item.widget()
             if widget:
-                self.actions_layout.removeWidget(widget)
-                widget.deleteLater()
+                widget.setParent(None)
 
-        # Adiciona os botões na imagem principal
-        btn_print = QPushButton("🖨️")
-        btn_print.setStyleSheet(FLOATING_BUTTON_STYLE)
-        btn_print.clicked.connect(lambda: imprimir_imagem(path))
+        arquivos = sorted([
+            os.path.join(self.fotos_path, f)
+            for f in os.listdir(self.fotos_path)
+            if f.lower().endswith((".jpg", ".jpeg", ".png", ".webp"))
+        ], key=os.path.getctime, reverse=True)
 
-        btn_whatsapp = QPushButton("💬")
-        btn_whatsapp.setStyleSheet(FLOATING_BUTTON_STYLE)
-        btn_whatsapp.clicked.connect(lambda: enviar_whatsapp(path))
+        if arquivos:
+            self.exibir_foto_principal(arquivos[0])
+        else:
+            self.label_foto.clear()
+            self.foto_atual = None
 
-        btn_delete = QPushButton("❌")
-        btn_delete.setStyleSheet(FLOATING_BUTTON_STYLE)
-        btn_delete.clicked.connect(lambda: self.confirmar_exclusao(path))
+        for caminho in arquivos[:4]:
+            thumb = QLabel()
+            pixmap = QPixmap(caminho).scaled(160, 160, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            thumb.setPixmap(pixmap)
+            thumb.setStyleSheet("margin: 8px; border: 2px solid #888;")
+            thumb.mousePressEvent = lambda event, f=caminho: self.exibir_foto_principal(f)
 
-        self.actions_layout.addWidget(btn_print)
-        self.actions_layout.addWidget(btn_whatsapp)
-        self.actions_layout.addWidget(btn_delete)
+            self.thumbnail_bar.addWidget(thumb)
 
-    def confirmar_exclusao(self, path):
-        resp = QMessageBox.question(self, "Excluir Imagem", "Tem certeza que deseja excluir essa imagem?")
-        if resp == QMessageBox.StandardButton.Yes:
-            excluir_imagem(path)
-            self.carregar()
+    def exibir_foto_principal(self, caminho):
+        pixmap = QPixmap(caminho).scaled(500, 500, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self.label_foto.setPixmap(pixmap)
+        self.foto_atual = caminho
 
-    def voltar(self):
-        if self.controller:
-            self.controller.open_event_window()
+    def imprimir_foto(self):
+        if self.foto_atual:
+            self.processor.imprimir(self.foto_atual)
+
+    def enviar_whatsapp(self):
+        if self.foto_atual:
+            self.processor.enviar_whatsapp(self.foto_atual)
+
+    def excluir_foto(self):
+        if self.foto_atual and os.path.exists(self.foto_atual):
+            os.remove(self.foto_atual)
+            self.foto_atual = None
+            self.atualizar_miniaturas()
 
     def abrir_configuracoes(self):
-        if self.controller:
-            self.controller.open_config_window()
+        self.controller.open_config_window()

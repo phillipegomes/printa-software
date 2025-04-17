@@ -1,4 +1,3 @@
-
 import requests
 import os
 
@@ -22,10 +21,7 @@ class WhatsAppSender:
         try:
             url = "http://localhost:21465/send-image"
             files = {'file': open(imagem_path, 'rb')}
-            data = {
-                "phone": self.numero,
-                "caption": self.mensagem
-            }
+            data = {"phone": self.numero, "caption": self.mensagem}
             response = requests.post(url, files=files, data=data)
             if response.status_code == 200:
                 print("✅ Imagem enviada via WhatsApp com sucesso!")

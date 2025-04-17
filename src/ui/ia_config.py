@@ -1,68 +1,47 @@
 # src/ui/ia_config.py
+
 from PyQt6.QtWidgets import (
-    QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
-    QComboBox, QLineEdit, QCheckBox
+    QWidget, QVBoxLayout, QLabel, QCheckBox,
+    QPushButton, QHBoxLayout
 )
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt
-import os
 
-class IAConfigWindow(QWidget):
-    def __init__(self):
+class IAConfig(QWidget):
+    def __init__(self, config_manager):
         super().__init__()
-        self.setWindowTitle("Configuração de IA")
+        self.config_manager = config_manager
         self.setStyleSheet("background-color: #1e1e1e; color: white; font-family: Arial;")
-        self.setFixedSize(600, 500)
 
-        layout = QVBoxLayout()
+        self.layout = QVBoxLayout(self)
 
-        # Ativar IA
+        self.label = QLabel("\u269b\ufe0f Configurações de Inteligência Artificial")
+        self.label.setStyleSheet("font-size: 16px; font-weight: bold; margin-bottom: 10px;")
+        self.layout.addWidget(self.label)
+
         self.checkbox_ia = QCheckBox("Ativar IA")
-        layout.addWidget(self.checkbox_ia)
+        self.layout.addWidget(self.checkbox_ia)
 
-        # Estilos de IA
-        layout.addWidget(QLabel("Escolha um estilo de IA:"))
-        self.combo_estilo = QComboBox()
-        self.combo_estilo.addItems(["Cartoon (Offline)", "Ghibli (Offline)", "Anime (Online)", "Realismo (Online)", "Game Style (Online)"])
-        layout.addWidget(self.combo_estilo)
+        # Botões Salvar e Reverter
+        btn_layout = QHBoxLayout()
+        self.btn_salvar = QPushButton("Salvar IA")
+        self.btn_salvar.clicked.connect(self.salvar)
 
-        # Miniatura de exemplo
-        self.img_demo = QLabel()
-        self.img_demo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.img_demo)
-
-        # Descrição
-        self.input_desc = QLineEdit()
-        self.input_desc.setPlaceholderText("Descreva o que a IA deve gerar (opcional para IA online)")
-        layout.addWidget(self.input_desc)
-
-        # Botão de teste IA
-        self.btn_teste = QPushButton("Aplicar Teste com Imagem Exemplo")
-        self.btn_teste.clicked.connect(self.aplicar_teste)
-        layout.addWidget(self.btn_teste)
-
-        # Botões de ação
-        botoes_layout = QHBoxLayout()
-        self.btn_salvar = QPushButton("Salvar")
         self.btn_reverter = QPushButton("Reverter padrão")
-        botoes_layout.addWidget(self.btn_salvar)
-        botoes_layout.addWidget(self.btn_reverter)
-        layout.addLayout(botoes_layout)
+        self.btn_reverter.clicked.connect(self.reverter_padrao)
 
-        self.setLayout(layout)
+        btn_layout.addWidget(self.btn_salvar)
+        btn_layout.addWidget(self.btn_reverter)
+        self.layout.addLayout(btn_layout)
 
-    def aplicar_teste(self):
-        estilo = self.combo_estilo.currentText()
-        if "Cartoon" in estilo:
-            path_img = "assets/test_cartoon.jpg"
-        elif "Ghibli" in estilo:
-            path_img = "assets/test_ghibli.jpg"
-        elif "Anime" in estilo:
-            path_img = "assets/test_anime.jpg"
-        elif "Game" in estilo:
-            path_img = "assets/test_game.jpg"
-        else:
-            path_img = "assets/test_realismo.jpg"
+        self.carregar()
 
-        if os.path.exists(path_img):
-            self.img_demo.setPixmap(QPixmap(path_img).scaled(300, 200, Qt.AspectRatioMode.KeepAspectRatio))
+    def carregar(self):
+        ia_config = self.config_manager.config.get("ia", {})
+        self.checkbox_ia.setChecked(ia_config.get("ativar_ia", False))
+
+    def salvar(self):
+        self.config_manager.config.setdefault("ia", {})["ativar_ia"] = self.checkbox_ia.isChecked()
+        self.config_manager.salvar_config()  # Garante persistência imediata
+
+    def reverter_padrao(self):
+        self.checkbox_ia.setChecked(False)
+        self.salvar()

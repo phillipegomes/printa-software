@@ -1,19 +1,11 @@
-import subprocess
-
 class PrinterManager:
-    def __init__(self):
-        self.print_count = 0
+    def __init__(self, evento_path, config):
+        self.evento_path = evento_path
+        self.config = config
+        self.status = "Pronto"
+        self.total_impressoes = 0
+        self.fotos_restantes = 999
 
-    def get_status(self):
-        try:
-            result = subprocess.check_output(["lpstat", "-p"], universal_newlines=True)
-            if "is idle" in result:
-                return "Pronta"
-            elif "disabled" in result:
-                return "Desativada"
-            elif "is printing" in result:
-                return "Imprimindo"
-            else:
-                return "Status desconhecido"
-        except Exception as e:
-            return f"Erro: {e}"
+    def imprimir(self, imagem_path, copias=1):
+        print(f"🖨️ Imprimindo {copias}x: {imagem_path}")
+        self.total_impressoes += copias
