@@ -1,5 +1,4 @@
-
-# main_styles.py
+# src/ui/main_styles.py
 
 MAIN_STYLE = """
     background-color: #1e1e1e;
@@ -26,11 +25,7 @@ FLOATING_BUTTON_STYLE = """
     background-color: #2c2c2e;
     color: white;
     border: none;
-    padding: 4px 8px;
+    padding: 6px 12px;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 14px;
 """
-
-def carregar():
-    # Função de carregar que estava ausente
-    print("Carregando estilos principais...")

@@ -1,16 +1,21 @@
+# src/modules/file_watcher.py
+
 import os
-from PyQt6.QtCore import QFileSystemWatcher, QObject, pyqtSignal
+import time
+import threading
 
-class FileWatcher(QObject):
-    pasta_alterada = pyqtSignal(str)
+def iniciar_monitoramento(pasta, callback, intervalo=3):
+    def monitorar():
+        arquivos_vistos = set(os.listdir(pasta))
+        while True:
+            time.sleep(intervalo)
+            arquivos_atuais = set(os.listdir(pasta))
+            novos = arquivos_atuais - arquivos_vistos
+            if novos:
+                for nome in novos:
+                    if nome.lower().endswith((".jpg", ".jpeg", ".png")):
+                        callback(os.path.join(pasta, nome))
+                arquivos_vistos = arquivos_atuais
 
-    def __init__(self, pasta):
-        super().__init__()
-        self.pasta = pasta
-        self.watcher = QFileSystemWatcher()
-        self.watcher.addPath(pasta)
-        self.watcher.directoryChanged.connect(self.on_directory_changed)
-
-    def on_directory_changed(self, path):
-        print(f"[🔄 FileWatcher] Alteração detectada em: {path}")
-        self.pasta_alterada.emit(path)
+    thread = threading.Thread(target=monitorar, daemon=True)
+    thread.start()
